@@ -66,6 +66,13 @@
           "condition_type": "on_job_success",
           "target_job_id": "ac44aea9-d9cc-4588-9072-964db312916a"
         },
+        "Map-and-process-data->Post-to-HAPI-FHIR": {
+          "enabled": true,
+          "id": "3f99f218-b538-4a95-98f1-9341f52f198a",
+          "source_job_id": "155ed6d7-1e29-412a-a011-07422459c1e5",
+          "condition_type": "on_job_success",
+          "target_job_id": "ba9a0e7d-81a2-4fb5-b376-a233b3738471"
+        },
         "Post-to-HAPI-FHIR->Report-Error": {
           "enabled": true,
           "id": "f5dc9d61-497b-4a4f-ae76-2972c4efa574",
@@ -74,13 +81,6 @@
           "condition_expression": "state.data.response.statusCode==400",
           "condition_label": "failed?",
           "target_job_id": "41771ce6-2772-4750-b929-7adf87748cd4"
-        },
-        "Map-and-process-data->Post-to-HAPI-FHIR": {
-          "enabled": true,
-          "id": "3f99f218-b538-4a95-98f1-9341f52f198a",
-          "source_job_id": "155ed6d7-1e29-412a-a011-07422459c1e5",
-          "condition_type": "on_job_success",
-          "target_job_id": "ba9a0e7d-81a2-4fb5-b376-a233b3738471"
         }
       }
     },
@@ -88,10 +88,10 @@
       "id": "ad8f643a-6bda-453e-af48-aeb213069538",
       "name": "cdr-to-ndr",
       "inserted_at": "2024-06-13T08:12:03Z",
-      "updated_at": "2024-06-13T11:14:40Z",
+      "updated_at": "2024-06-13T13:00:23Z",
       "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
       "deleted_at": null,
-      "lock_version": 8,
+      "lock_version": 12,
       "triggers": {
         "webhook": {
           "enabled": true,
@@ -103,7 +103,7 @@
         "Annonymize-Data": {
           "id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b",
           "name": "Annonymize Data",
-          "body": "fn(state=> {\n    state.data.delete(\"name\")\n    state.data.delete(\"telecom\")\n    state.data.delete(\"address\")\n    state.data.delete(\"contact\")\n\n    return state;\n})",
+          "body": "fn(state=> {\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.address;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
           "adaptor": "@openfn/language-common@latest"
         },
         "Create-Organization": {
@@ -139,7 +139,7 @@
         "Map-Data": {
           "id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
           "name": "Map Data",
-          "body": "fn(state=> {\nconst fhirData = state.data;\n\nconst patient = {\n  resourceType: fhirData.resourceType,\n  id: fhirData.id,\n  identifier: fhirData.identifier.map(id => ({\n    use: id.use,\n    type: {\n      coding: id.type.coding.map(coding => ({\n        system: coding.system,\n        code: coding.code\n      }))\n    },\n    system: id.system,\n    value: id.value,\n    period: {\n      start: id.period.start\n    },\n    assigner: {\n      display: id.assigner.display\n    }\n  })),\n  active: fhirData.active,\n  name: fhirData.name.map(name => ({\n    use: name.use,\n    family: name.family,\n    given: name.given,\n    period: name.period ? { end: name.period.end } : undefined\n  })),\n  telecom: fhirData.telecom.map(telecom => ({\n    system: telecom.system,\n    value: telecom.value,\n    use: telecom.use,\n    rank: telecom.rank,\n    period: telecom.period ? { end: telecom.period.end } : undefined\n  })),\n  gender: fhirData.gender,\n  birthDate: fhirData.birthDate,\n  _birthDate: {\n    extension: fhirData._birthDate.extension.map(ext => ({\n      url: ext.url,\n      valueDateTime: ext.valueDateTime\n    }))\n  },\n  address: fhirData.address.map(address => ({\n    use: address.use,\n    type: address.type,\n    text: address.text,\n    line: address.line,\n    city: address.city,\n    district: address.district,\n    state: address.state,\n    postalCode: address.postalCode,\n    period: {\n      start: address.period.start\n    }\n  })),\n  contact: fhirData.contact.map(contact => ({\n    relationship: contact.relationship.map(rel => ({\n      coding: rel.coding.map(coding => ({\n        system: coding.system,\n        code: coding.code\n      }))\n    })),\n    name: {\n      family: contact.name.family,\n      given: contact.name.given,\n      _family: {\n        extension: contact.name._family.extension.map(ext => ({\n          url: ext.url,\n          valueString: ext.valueString\n        }))\n      }\n    },\n    telecom: contact.telecom.map(telecom => ({\n      system: telecom.system,\n      value: telecom.value\n    })),\n    address: {\n      use: contact.address.use,\n      type: contact.address.type,\n      text: contact.address.text,\n      line: contact.address.line,\n      city: contact.address.city,\n      district: contact.address.district,\n      state: contact.address.state,\n      postalCode: contact.address.postalCode,\n      period: {\n        start: contact.address.period.start\n      }\n    },\n    gender: contact.gender,\n    period: {\n      start: contact.period.start\n    }\n  })),\n  managingOrganization: {\n    reference: fhirData.managingOrganization.reference\n  },\n  deceasedBoolean: fhirData.deceasedBoolean,\n  text: {\n    status: fhirData.text.status,\n    div: fhirData.text.div\n  }\n};\n\nreturn {...state, patient}\n})",
+          "body": "fn(state=> {\nconst fhirData = state.data;\n\nconst patient = {\n  resourceType: fhirData.resourceType,\n  id: fhirData.id,\n  identifier: fhirData.identifier.map(id => ({\n    system: id.system,\n    value: id.value,\n  })),\n  active: fhirData.active,\n  gender: fhirData.gender,\n  birthDate: fhirData.birthDate,\n\n  managingOrganization: fhirData.managingOrganization.reference,\n  deceasedBoolean: fhirData.deceasedBoolean,\n  text: fhirData.text\n};\n\nreturn {...state, patient}\n})",
           "adaptor": "@openfn/language-common@latest"
         }
       },
@@ -150,13 +150,6 @@
           "source_trigger_id": "9308f827-2912-4368-8892-9a9d5ed53301",
           "condition_type": "always",
           "target_job_id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b"
-        },
-        "Create-Patient->Log-error": {
-          "enabled": true,
-          "id": "7b0d3bb6-1d12-4f74-8acb-3664797f3c49",
-          "source_job_id": "75e04925-019d-4787-853a-54275fedd86f",
-          "condition_type": "on_job_failure",
-          "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
         },
         "Create-Encounter->Log-error": {
           "enabled": true,
@@ -172,19 +165,19 @@
           "condition_type": "on_job_failure",
           "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
         },
+        "Create-Patient->Log-error": {
+          "enabled": true,
+          "id": "7b0d3bb6-1d12-4f74-8acb-3664797f3c49",
+          "source_job_id": "75e04925-019d-4787-853a-54275fedd86f",
+          "condition_type": "on_job_failure",
+          "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
+        },
         "Create-Organization->Log-error": {
           "enabled": true,
           "id": "efc37e16-830b-4430-9d2d-ab696d98875c",
           "source_job_id": "52a8787c-fefe-42ce-96cb-84270d9d9da2",
           "condition_type": "on_job_failure",
           "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
-        },
-        "Map-Data->Create-Encounter": {
-          "enabled": true,
-          "id": "dd15fcc7-0abc-40f1-a5fb-f5557218df90",
-          "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
-          "condition_type": "on_job_success",
-          "target_job_id": "ac088906-4413-4222-8d94-eca91fdeb73a"
         },
         "Annonymize-Data->Map-Data": {
           "enabled": true,
@@ -213,6 +206,46 @@
           "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
           "condition_type": "on_job_success",
           "target_job_id": "75e04925-019d-4787-853a-54275fedd86f"
+        },
+        "Map-Data->Create-Encounter": {
+          "enabled": true,
+          "id": "dd15fcc7-0abc-40f1-a5fb-f5557218df90",
+          "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
+          "condition_type": "on_job_success",
+          "target_job_id": "ac088906-4413-4222-8d94-eca91fdeb73a"
+        }
+      }
+    },
+    "test-patient-fhir": {
+      "id": "79930c19-1ce1-4144-82ab-e10d7652e2b5",
+      "name": "test-patient-fhir",
+      "inserted_at": "2024-06-13T11:39:36Z",
+      "updated_at": "2024-06-13T12:56:45Z",
+      "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
+      "deleted_at": null,
+      "lock_version": 7,
+      "triggers": {
+        "webhook": {
+          "enabled": true,
+          "id": "b8aaf960-b742-4e20-b474-45eb60583e92",
+          "type": "webhook"
+        }
+      },
+      "jobs": {
+        "Post-Patient": {
+          "id": "a3b64302-94f1-4cb5-9490-ba87eb6dd6c6",
+          "name": "Post Patient",
+          "body": "post(\"Patient\", {body: state.data,  \n headers: {'content-type': 'application/json'}, \n parseAs: 'json',\n //errors: { 400: false }, \n })",
+          "adaptor": "@openfn/language-http@latest"
+        }
+      },
+      "edges": {
+        "webhook->Post-Patient": {
+          "enabled": true,
+          "id": "027a6d08-a98d-4f40-a803-5a1be5aee620",
+          "source_trigger_id": "b8aaf960-b742-4e20-b474-45eb60583e92",
+          "condition_type": "always",
+          "target_job_id": "a3b64302-94f1-4cb5-9490-ba87eb6dd6c6"
         }
       }
     }

@@ -106,17 +106,17 @@ workflows:
         target_job: Validate-with-NDR-HAPI-FHIR
         condition_type: on_job_success
         enabled: false
+      Map-and-process-data->Post-to-HAPI-FHIR:
+        source_job: Map-and-process-data
+        target_job: Post-to-HAPI-FHIR
+        condition_type: on_job_success
+        enabled: true
       Post-to-HAPI-FHIR->Report-Error:
         source_job: Post-to-HAPI-FHIR
         target_job: Report-Error
         condition_type: js_expression
         condition_label: failed?
         condition_expression: state.data.response.statusCode==400
-        enabled: true
-      Map-and-process-data->Post-to-HAPI-FHIR:
-        source_job: Map-and-process-data
-        target_job: Post-to-HAPI-FHIR
-        condition_type: on_job_success
         enabled: true
   cdr-to-ndr:
     name: cdr-to-ndr
@@ -128,10 +128,14 @@ workflows:
         # globals:
         body: |
           fn(state=> {
-              state.data.delete("name")
-              state.data.delete("telecom")
-              state.data.delete("address")
-              state.data.delete("contact")
+              delete state.data.name;
+              delete state.data.telecom;
+              delete state.data.address;
+              delete state.data.contact;
+              delete state.data.extension; //contains religion, occupation, education level, target pop group
+              delete state.data.maritalStatus; 
+          
+              //only keeping birthdate and gender
           
               return state;
           })
@@ -203,104 +207,16 @@ workflows:
             resourceType: fhirData.resourceType,
             id: fhirData.id,
             identifier: fhirData.identifier.map(id => ({
-              use: id.use,
-              type: {
-                coding: id.type.coding.map(coding => ({
-                  system: coding.system,
-                  code: coding.code
-                }))
-              },
               system: id.system,
               value: id.value,
-              period: {
-                start: id.period.start
-              },
-              assigner: {
-                display: id.assigner.display
-              }
             })),
             active: fhirData.active,
-            name: fhirData.name.map(name => ({
-              use: name.use,
-              family: name.family,
-              given: name.given,
-              period: name.period ? { end: name.period.end } : undefined
-            })),
-            telecom: fhirData.telecom.map(telecom => ({
-              system: telecom.system,
-              value: telecom.value,
-              use: telecom.use,
-              rank: telecom.rank,
-              period: telecom.period ? { end: telecom.period.end } : undefined
-            })),
             gender: fhirData.gender,
             birthDate: fhirData.birthDate,
-            _birthDate: {
-              extension: fhirData._birthDate.extension.map(ext => ({
-                url: ext.url,
-                valueDateTime: ext.valueDateTime
-              }))
-            },
-            address: fhirData.address.map(address => ({
-              use: address.use,
-              type: address.type,
-              text: address.text,
-              line: address.line,
-              city: address.city,
-              district: address.district,
-              state: address.state,
-              postalCode: address.postalCode,
-              period: {
-                start: address.period.start
-              }
-            })),
-            contact: fhirData.contact.map(contact => ({
-              relationship: contact.relationship.map(rel => ({
-                coding: rel.coding.map(coding => ({
-                  system: coding.system,
-                  code: coding.code
-                }))
-              })),
-              name: {
-                family: contact.name.family,
-                given: contact.name.given,
-                _family: {
-                  extension: contact.name._family.extension.map(ext => ({
-                    url: ext.url,
-                    valueString: ext.valueString
-                  }))
-                }
-              },
-              telecom: contact.telecom.map(telecom => ({
-                system: telecom.system,
-                value: telecom.value
-              })),
-              address: {
-                use: contact.address.use,
-                type: contact.address.type,
-                text: contact.address.text,
-                line: contact.address.line,
-                city: contact.address.city,
-                district: contact.address.district,
-                state: contact.address.state,
-                postalCode: contact.address.postalCode,
-                period: {
-                  start: contact.address.period.start
-                }
-              },
-              gender: contact.gender,
-              period: {
-                start: contact.period.start
-              }
-            })),
-            managingOrganization: {
-              reference: fhirData.managingOrganization.reference
-            },
+          
+            managingOrganization: fhirData.managingOrganization.reference,
             deceasedBoolean: fhirData.deceasedBoolean,
-            text: {
-              status: fhirData.text.status,
-              div: fhirData.text.div
-            }
+            text: fhirData.text
           };
           
           return {...state, patient}
@@ -315,11 +231,6 @@ workflows:
         target_job: Annonymize-Data
         condition_type: always
         enabled: true
-      Create-Patient->Log-error:
-        source_job: Create-Patient
-        target_job: Log-error
-        condition_type: on_job_failure
-        enabled: true
       Create-Encounter->Log-error:
         source_job: Create-Encounter
         target_job: Log-error
@@ -330,15 +241,15 @@ workflows:
         target_job: Log-error
         condition_type: on_job_failure
         enabled: true
+      Create-Patient->Log-error:
+        source_job: Create-Patient
+        target_job: Log-error
+        condition_type: on_job_failure
+        enabled: true
       Create-Organization->Log-error:
         source_job: Create-Organization
         target_job: Log-error
         condition_type: on_job_failure
-        enabled: true
-      Map-Data->Create-Encounter:
-        source_job: Map-Data
-        target_job: Create-Encounter
-        condition_type: on_job_success
         enabled: true
       Annonymize-Data->Map-Data:
         source_job: Annonymize-Data
@@ -359,4 +270,33 @@ workflows:
         source_job: Map-Data
         target_job: Create-Patient
         condition_type: on_job_success
+        enabled: true
+      Map-Data->Create-Encounter:
+        source_job: Map-Data
+        target_job: Create-Encounter
+        condition_type: on_job_success
+        enabled: true
+  test-patient-fhir:
+    name: test-patient-fhir
+    jobs:
+      Post-Patient:
+        name: Post Patient
+        adaptor: '@openfn/language-http@latest'
+        # credential:
+        # globals:
+        body: |
+          post("Patient", {body: state.data,  
+           headers: {'content-type': 'application/json'}, 
+           parseAs: 'json',
+           //errors: { 400: false }, 
+           })
+    triggers:
+      webhook:
+        type: webhook
+        enabled: true
+    edges:
+      webhook->Post-Patient:
+        source_trigger: webhook
+        target_job: Post-Patient
+        condition_type: always
         enabled: true

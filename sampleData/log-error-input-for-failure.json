@@ -1,0 +1,102 @@
+{
+  "data": {
+    "id": "be435f4d-9a15-4d56-b7da-0ed7c5e1e949",
+    "issue": [
+      {
+        "code": "invalid",
+        "details": {
+          "coding": [
+            {
+              "code": "5000",
+              "system": "http://hl7.org/fhir/dotnet-api-operation-outcome"
+            }
+          ],
+          "text": "Body content could not be parsed. See log for more details."
+        },
+        "severity": "error"
+      },
+      {
+        "code": "not-supported",
+        "details": {
+          "coding": [
+            {
+              "code": "5003",
+              "system": "http://hl7.org/fhir/dotnet-api-operation-outcome"
+            }
+          ],
+          "text": "Argument is not supported"
+        },
+        "diagnostics": "/Patient",
+        "severity": "warning"
+      }
+    ],
+    "meta": {
+      "lastUpdated": "2024-06-13T14:55:23.0285004+00:00",
+      "versionId": "d7aff609-ec5f-40f8-b8b7-77b5605b5231"
+    },
+    "resourceType": "OperationOutcome",
+    "response": {
+      "body": "[Circular]",
+      "duration": 233,
+      "headers": {
+        "cache-control": "no-store",
+        "connection": "keep-alive",
+        "content-length": "893",
+        "content-type": "application/fhir+json; fhirVersion=4.0; charset=utf-8",
+        "custom-correlation-id": "41956663-cc32-4df3-b5c4-03a748d7df4e",
+        "date": "Thu, 13 Jun 2024 14:55:23 GMT",
+        "last-modified": "Thu, 13 Jun 2024 14:55:23 GMT",
+        "strict-transport-security": "max-age=15724800; includeSubDomains"
+      },
+      "method": "POST",
+      "statusCode": 400,
+      "statusMessage": "Bad Request",
+      "url": "https://server.fire.ly/r4/Patient"
+    }
+  },
+  "mapped_resource": {},
+  "references": [
+    {
+      "body": "{\"resourceType\":\"Bundle\",\"type\":\"transaction\",\"entry\":[{\"resource\":{\"resourceType\":\"Patient\",\"id\":\"fe6af0dd-6163-4baa-9ffd-634759abb54f\",\"meta\":{\"versionId\":\"1\",\"lastUpdated\":\"2024-06-13T12:56:53.576+00:00\",\"source\":\"#GO4emofVX59rSbEz\"},\"link\":[{\"other\":{\"reference\":\"http://localhost:5001/fhir/Patient/0x188c\"},\"type\":\"refer\"}]},\"request\":{\"method\":\"PUT\",\"url\":\"Patient/fe6af0dd-6163-4baa-9ffd-634759abb54f\"}}]}",
+      "headers": {
+        "X-Forwarded-For": "172.25.0.1",
+        "X-Forwarded-Host": "localhost:5001",
+        "X-OpenHIM-TransactionID": "666af5aac3f97cb0f00e1db3",
+        "accept": "application/json, text/plain, */*",
+        "accept-encoding": "gzip, compress, deflate, br",
+        "connection": "close",
+        "content-length": "412",
+        "content-type": "application/json",
+        "user-agent": "axios/1.7.2"
+      },
+      "method": "POST",
+      "path": "/kafka",
+      "pattern": "^/kafka$"
+    }
+  ],
+  "request": {
+    "headers": [],
+    "key": "",
+    "offset": 5,
+    "partition": 2,
+    "topic": "fhir-data-pipes",
+    "ts": 1718285738495
+  },
+  "resource": {
+    "id": "fe6af0dd-6163-4baa-9ffd-634759abb54f",
+    "link": [
+      {
+        "other": {
+          "reference": "http://localhost:5001/fhir/Patient/0x188c"
+        },
+        "type": "refer"
+      }
+    ],
+    "meta": {
+      "lastUpdated": "2024-06-13T12:56:53.576+00:00",
+      "source": "#GO4emofVX59rSbEz",
+      "versionId": "1"
+    },
+    "resourceType": "Patient"
+  }
+}

@@ -1,0 +1,33 @@
+{
+    "options": {
+        "start": "getTrackedEntities"
+    },
+    "workflow": {
+        "steps": [
+            {
+                "id": "getTrackedEntities",
+                "adaptor": "dhis2",
+                "configuration": "tmp/dhis2-play-creds.json",
+                "expression": "step1-getTrackedEntities.js",
+                "state": {},
+                "next": {
+                    "mapTransform": "!state.error"
+                }
+            },
+            {
+                "id": "mapTransform",
+                "adaptor": "common",
+                "expression": "step2-map-transform.js",
+                "next": {
+                    "postToOpenhim": "!state.error"
+                }
+            },
+            {
+                "id": "postToOpenhim",
+                "adaptor": "http",
+                "expression": "step3-post-to-openhim.js",
+                "configuration": "tmp/openhim-creds.json",
+            }
+        ]
+    }
+}

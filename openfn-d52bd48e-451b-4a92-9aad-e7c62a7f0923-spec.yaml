@@ -1,0 +1,362 @@
+name: jembi-demo
+# description:
+# credentials:
+# globals:
+workflows:
+  [Archive]-cdr-to-ndr:
+    name: [Archive] cdr-to-ndr
+    jobs:
+      Map-and-process-data:
+        name: Map and process data
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state => {
+            // do some things to state
+            return state;
+          });
+      Validate-with-NDR-HAPI-FHIR:
+        name: Validate with NDR HAPI FHIR
+        adaptor: '@openfn/language-http@latest'
+        # credential:
+        # globals:
+        body: |
+          post('/Patient/$validate', {
+             body: state.data,
+             headers: {'content-type': 'application/json'},
+           }); 
+          
+          //  create('/Patient/$validate', {
+          //    body: state.data,
+          //    headers: {'content-type': 'application/json'},
+          //  }); 
+          
+          
+      Post-to-HAPI-FHIR:
+        name: Post to HAPI FHIR
+        adaptor: '@openfn/language-http@latest'
+        # credential:
+        # globals:
+        body: |
+          post("Patient", {body: state.data,  
+           headers: {'content-type': 'application/json'}, 
+           errors: { 400: false }, 	
+           parseAs: 'json',
+           }, state => {
+            //console.log('response ::', JSON.stringify(state.response, null,2));
+            state.data.response = state.response; 
+            return state; 
+           }
+          )
+          
+          // create("Patient", {body: state.data,  
+          //  headers: {'content-type': 'application/json'}},
+          // )a
+          
+          // request("POST","Patient", {body: state.data,  
+          //  headers: {'content-type': 'application/json'}});
+      Report-Error:
+        name: Report Error
+        adaptor: '@openfn/language-postgresql@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state => {
+            state.errorLog = {
+              resource_id: state.data.id,
+              failure_type: 'validation error',
+              //data: state.references[0], //data we tried to create
+              resource_type: state.references[0].resourceType,
+              issue_code: state.data.issue[0].code,
+              issue_detail: state.data.issue[0].details.text,
+              issue_diagnostics: state.data.issue[0].diagnostics,
+              issue_location: state.data.issue[0].location,
+              last_updated: state.data.meta.lastUpdated,
+              statusCode: state.data.response.statusCode,
+              statusMessage: state.data.response.statusMessage
+            }
+            console.log('Error to log:: ', JSON.stringify(state.errorLog,null,2)); 
+            return state; 
+          });
+          
+          // insert('fhir_errors', 
+          //   state => state.errorLog, 
+          //   { logValues: true }
+          // );
+          
+          //kafka mappings - don't think we need these
+          // ts: state.request.ts,
+          //     topic: state.request.topic,
+          //     offset: state.request.offset,
+          //     partition: state.request.partition,
+          //     key: state.request.key,
+    triggers:
+      webhook:
+        type: webhook
+        enabled: true
+    edges:
+      webhook->Map-and-process-data:
+        source_trigger: webhook
+        target_job: Map-and-process-data
+        condition_type: always
+        enabled: true
+      Map-and-process-data->Validate-with-NDR-HAPI-FHIR:
+        source_job: Map-and-process-data
+        target_job: Validate-with-NDR-HAPI-FHIR
+        condition_type: on_job_success
+        enabled: false
+      Post-to-HAPI-FHIR->Report-Error:
+        source_job: Post-to-HAPI-FHIR
+        target_job: Report-Error
+        condition_type: js_expression
+        condition_label: failed?
+        condition_expression: state.data.response.statusCode==400
+        enabled: true
+      Map-and-process-data->Post-to-HAPI-FHIR:
+        source_job: Map-and-process-data
+        target_job: Post-to-HAPI-FHIR
+        condition_type: on_job_success
+        enabled: true
+  cdr-to-ndr:
+    name: cdr-to-ndr
+    jobs:
+      Annonymize-Data:
+        name: Annonymize Data
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state=> {
+              state.data.delete("name")
+              state.data.delete("telecom")
+              state.data.delete("address")
+              state.data.delete("contact")
+          
+              return state;
+          })
+      Create-Organization:
+        name: Create Organization
+        adaptor: '@openfn/language-fhir@latest'
+        # credential:
+        # globals:
+        body: |
+          // Use pure JavaScript to add operations to your
+          // step. Click Docs to see list of operations or visit
+          // https://bit.ly/OFNJWG for our job writing guide
+          // and example job codes.
+          
+      Create-Patient:
+        name: Create Patient
+        adaptor: '@openfn/language-fhir@latest'
+        # credential:
+        # globals:
+        body: |
+          // Use pure JavaScript to add operations to your
+          // step. Click Docs to see list of operations or visit
+          // https://bit.ly/OFNJWG for our job writing guide
+          // and example job codes.
+          
+      Create-Encounter:
+        name: Create Encounter
+        adaptor: '@openfn/language-fhir@latest'
+        # credential:
+        # globals:
+        body: |
+          // Use pure JavaScript to add operations to your
+          // step. Click Docs to see list of operations or visit
+          // https://bit.ly/OFNJWG for our job writing guide
+          // and example job codes.
+          
+      Create-Condition:
+        name: Create Condition
+        adaptor: '@openfn/language-fhir@latest'
+        # credential:
+        # globals:
+        body: |
+          // Use pure JavaScript to add operations to your
+          // step. Click Docs to see list of operations or visit
+          // https://bit.ly/OFNJWG for our job writing guide
+          // and example job codes.
+          
+      Log-error:
+        name: Log error
+        adaptor: '@openfn/language-postgresql@latest'
+        # credential:
+        # globals:
+        body: |
+          // Use pure JavaScript to add operations to your
+          // step. Click Docs to see list of operations or visit
+          // https://bit.ly/OFNJWG for our job writing guide
+          // and example job codes.
+          
+      Map-Data:
+        name: Map Data
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state=> {
+          const fhirData = state.data;
+          
+          const patient = {
+            resourceType: fhirData.resourceType,
+            id: fhirData.id,
+            identifier: fhirData.identifier.map(id => ({
+              use: id.use,
+              type: {
+                coding: id.type.coding.map(coding => ({
+                  system: coding.system,
+                  code: coding.code
+                }))
+              },
+              system: id.system,
+              value: id.value,
+              period: {
+                start: id.period.start
+              },
+              assigner: {
+                display: id.assigner.display
+              }
+            })),
+            active: fhirData.active,
+            name: fhirData.name.map(name => ({
+              use: name.use,
+              family: name.family,
+              given: name.given,
+              period: name.period ? { end: name.period.end } : undefined
+            })),
+            telecom: fhirData.telecom.map(telecom => ({
+              system: telecom.system,
+              value: telecom.value,
+              use: telecom.use,
+              rank: telecom.rank,
+              period: telecom.period ? { end: telecom.period.end } : undefined
+            })),
+            gender: fhirData.gender,
+            birthDate: fhirData.birthDate,
+            _birthDate: {
+              extension: fhirData._birthDate.extension.map(ext => ({
+                url: ext.url,
+                valueDateTime: ext.valueDateTime
+              }))
+            },
+            address: fhirData.address.map(address => ({
+              use: address.use,
+              type: address.type,
+              text: address.text,
+              line: address.line,
+              city: address.city,
+              district: address.district,
+              state: address.state,
+              postalCode: address.postalCode,
+              period: {
+                start: address.period.start
+              }
+            })),
+            contact: fhirData.contact.map(contact => ({
+              relationship: contact.relationship.map(rel => ({
+                coding: rel.coding.map(coding => ({
+                  system: coding.system,
+                  code: coding.code
+                }))
+              })),
+              name: {
+                family: contact.name.family,
+                given: contact.name.given,
+                _family: {
+                  extension: contact.name._family.extension.map(ext => ({
+                    url: ext.url,
+                    valueString: ext.valueString
+                  }))
+                }
+              },
+              telecom: contact.telecom.map(telecom => ({
+                system: telecom.system,
+                value: telecom.value
+              })),
+              address: {
+                use: contact.address.use,
+                type: contact.address.type,
+                text: contact.address.text,
+                line: contact.address.line,
+                city: contact.address.city,
+                district: contact.address.district,
+                state: contact.address.state,
+                postalCode: contact.address.postalCode,
+                period: {
+                  start: contact.address.period.start
+                }
+              },
+              gender: contact.gender,
+              period: {
+                start: contact.period.start
+              }
+            })),
+            managingOrganization: {
+              reference: fhirData.managingOrganization.reference
+            },
+            deceasedBoolean: fhirData.deceasedBoolean,
+            text: {
+              status: fhirData.text.status,
+              div: fhirData.text.div
+            }
+          };
+          
+          return {...state, patient}
+          })
+    triggers:
+      webhook:
+        type: webhook
+        enabled: true
+    edges:
+      webhook->Annonymize-Data:
+        source_trigger: webhook
+        target_job: Annonymize-Data
+        condition_type: always
+        enabled: true
+      Create-Patient->Log-error:
+        source_job: Create-Patient
+        target_job: Log-error
+        condition_type: on_job_failure
+        enabled: true
+      Create-Encounter->Log-error:
+        source_job: Create-Encounter
+        target_job: Log-error
+        condition_type: on_job_failure
+        enabled: true
+      Create-Condition->Log-error:
+        source_job: Create-Condition
+        target_job: Log-error
+        condition_type: on_job_failure
+        enabled: true
+      Create-Organization->Log-error:
+        source_job: Create-Organization
+        target_job: Log-error
+        condition_type: on_job_failure
+        enabled: true
+      Map-Data->Create-Encounter:
+        source_job: Map-Data
+        target_job: Create-Encounter
+        condition_type: on_job_success
+        enabled: true
+      Annonymize-Data->Map-Data:
+        source_job: Annonymize-Data
+        target_job: Map-Data
+        condition_type: on_job_success
+        enabled: true
+      Map-Data->Create-Organization:
+        source_job: Map-Data
+        target_job: Create-Organization
+        condition_type: on_job_success
+        enabled: true
+      Map-Data->Create-Condition:
+        source_job: Map-Data
+        target_job: Create-Condition
+        condition_type: on_job_success
+        enabled: true
+      Map-Data->Create-Patient:
+        source_job: Map-Data
+        target_job: Create-Patient
+        condition_type: on_job_success
+        enabled: true

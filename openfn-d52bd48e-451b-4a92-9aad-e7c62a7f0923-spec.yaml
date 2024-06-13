@@ -127,17 +127,12 @@ workflows:
         # credential:
         # globals:
         body: |
-          fn(state=> {
-              //Removig PII here before sending it to NDR
-              delete state.data.name;
-              delete state.data.telecom;
-              delete state.data.contact;
-              delete state.data.extension; //contains religion, occupation, education level, target pop group
-              delete state.data.maritalStatus; 
-          
-              //only keeping birthdate and gender
-          
-              return state;
+          fn(state => {
+            const parsedData = JSON.parse(state.data.body); 
+            console.log(parsedData); 
+            state.resource = parsedData.entry[0].resource; 
+            console.log('show only the resource:: ', state.resource);
+            return state; 
           })
       Create-Organization:
         name: Create Organization
@@ -156,9 +151,9 @@ workflows:
         # credential:
         # globals:
         body: |
-          post($.data.resourceType, 
+          post($.resource.resourceType, 
             {
-              body: $.patient, 
+              body: $.mapped_resource, 
               errors: { 400: false }, 	
               headers: {'content-type': 'application/json'},
               parseAs: 'json'
@@ -232,11 +227,11 @@ workflows:
         body: |
           fn(state=> {
             //Map CDR data to NDR FHIR IG
-              const cdrData = state.data;
-              const patient = {
+              const cdrData = state.resource;
+              const mapped_resource = {
                 resourceType: cdrData.resourceType,
                 id: cdrData.id,
-                identifier: cdrData.identifier.map(id => ({
+                identifier: cdrData.identifier?.map(id => ({
                   type: id.system == "http://cdr.aacahb.gov.et/MRN"? {
                               "coding": [
                                   {
@@ -258,8 +253,8 @@ workflows:
                 deceasedBoolean: cdrData.deceasedBoolean,
                 text: cdrData.text
               };
-          // returned the mapped patient object
-              return {...state, patient}
+          // returned the mapped fhir resource
+              return {...state, mapped_resource}
           })
       Remove-PIIs:
         name: Remove PIIs
@@ -269,11 +264,11 @@ workflows:
         body: |
           fn(state=> {
               //Removig PII here before sending it to NDR
-              delete state.data.name;
-              delete state.data.telecom;
-              delete state.data.contact;
-              delete state.data.extension; //contains religion, occupation, education level, target pop group
-              delete state.data.maritalStatus; 
+              delete state.resource.name;
+              delete state.resource.telecom;
+              delete state.resource.contact;
+              delete state.resource.extension; //contains religion, occupation, education level, target pop group
+              delete state.resource.maritalStatus; 
           
               //only keeping birthdate and gender
           

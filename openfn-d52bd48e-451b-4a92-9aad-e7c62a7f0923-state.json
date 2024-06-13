@@ -88,10 +88,10 @@
       "id": "ad8f643a-6bda-453e-af48-aeb213069538",
       "name": "cdr-to-ndr",
       "inserted_at": "2024-06-13T08:12:03Z",
-      "updated_at": "2024-06-13T13:54:51Z",
+      "updated_at": "2024-06-13T14:06:15Z",
       "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
       "deleted_at": null,
-      "lock_version": 41,
+      "lock_version": 48,
       "triggers": {
         "webhook": {
           "enabled": true,
@@ -103,7 +103,7 @@
         "Analyze-Data": {
           "id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b",
           "name": "Analyze Data",
-          "body": "fn(state=> {\n    //Removig PII here before sending it to NDR\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
+          "body": "fn(state => {\n  const parsedData = JSON.parse(state.data.body); \n  console.log(parsedData); \n  state.resource = parsedData.entry[0].resource; \n  console.log('show only the resource:: ', state.resource);\n  return state; \n})",
           "adaptor": "@openfn/language-common@latest"
         },
         "Create-Organization": {
@@ -115,7 +115,7 @@
         "Create-FHIR-Resource": {
           "id": "75e04925-019d-4787-853a-54275fedd86f",
           "name": "Create FHIR Resource",
-          "body": "post($.data.resourceType, \n  {\n    body: $.patient, \n    errors: { 400: false }, \t\n    headers: {'content-type': 'application/json'},\n    parseAs: 'json'\n  },\n  state => {\n    state.data.response = state.response; \n    return state; \n})",
+          "body": "post($.resource.resourceType, \n  {\n    body: $.mapped_resource, \n    errors: { 400: false }, \t\n    headers: {'content-type': 'application/json'},\n    parseAs: 'json'\n  },\n  state => {\n    state.data.response = state.response; \n    return state; \n})",
           "adaptor": "@openfn/language-http@latest"
         },
         "Create-Encounter": {
@@ -139,13 +139,13 @@
         "Map-Data": {
           "id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
           "name": "Map Data",
-          "body": "fn(state=> {\n  //Map CDR data to NDR FHIR IG\n    const cdrData = state.data;\n    const patient = {\n      resourceType: cdrData.resourceType,\n      id: cdrData.id,\n      identifier: cdrData.identifier.map(id => ({\n        type: id.system == \"http://cdr.aacahb.gov.et/MRN\"? {\n                    \"coding\": [\n                        {\n                            \"code\": \"MR\",\n                            \"display\": \"Medical record number\",\n                            \"system\": \"http://terminology.hl7.org/CodeSystem/v2-0203\"\n                        }\n                    ],\n                    \"text\": \"Medical record number\"\n                } : undefined,\n        system: id.system,\n        value: id.value,\n      })),\n      active: cdrData.active,\n      gender: cdrData.gender,\n      birthDate: cdrData.birthDate,\n      address: cdrData.address,\n      managingOrganization: cdrData.managingOrganization,\n      deceasedBoolean: cdrData.deceasedBoolean,\n      text: cdrData.text\n    };\n// returned the mapped patient object\n    return {...state, patient}\n})",
+          "body": "fn(state=> {\n  //Map CDR data to NDR FHIR IG\n    const cdrData = state.resource;\n    const mapped_resource = {\n      resourceType: cdrData.resourceType,\n      id: cdrData.id,\n      identifier: cdrData.identifier?.map(id => ({\n        type: id.system == \"http://cdr.aacahb.gov.et/MRN\"? {\n                    \"coding\": [\n                        {\n                            \"code\": \"MR\",\n                            \"display\": \"Medical record number\",\n                            \"system\": \"http://terminology.hl7.org/CodeSystem/v2-0203\"\n                        }\n                    ],\n                    \"text\": \"Medical record number\"\n                } : undefined,\n        system: id.system,\n        value: id.value,\n      })),\n      active: cdrData.active,\n      gender: cdrData.gender,\n      birthDate: cdrData.birthDate,\n      address: cdrData.address,\n      managingOrganization: cdrData.managingOrganization,\n      deceasedBoolean: cdrData.deceasedBoolean,\n      text: cdrData.text\n    };\n// returned the mapped fhir resource\n    return {...state, mapped_resource}\n})",
           "adaptor": "@openfn/language-common@latest"
         },
         "Remove-PIIs": {
           "id": "a190cc21-e997-439d-a5ea-64895921eadb",
           "name": "Remove PIIs",
-          "body": "fn(state=> {\n    //Removig PII here before sending it to NDR\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
+          "body": "fn(state=> {\n    //Removig PII here before sending it to NDR\n    delete state.resource.name;\n    delete state.resource.telecom;\n    delete state.resource.contact;\n    delete state.resource.extension; //contains religion, occupation, education level, target pop group\n    delete state.resource.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
           "adaptor": "@openfn/language-common@latest"
         }
       },

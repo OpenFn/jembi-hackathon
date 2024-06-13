@@ -3,21 +3,21 @@
   "name": "jembi-demo",
   "description": null,
   "inserted_at": "2024-06-11T20:09:59",
-  "updated_at": "2024-06-13T08:31:11",
+  "updated_at": "2024-06-13T13:03:30",
   "scheduled_deletion": null,
   "dataclip_retention_period": null,
   "history_retention_period": null,
   "requires_mfa": false,
   "retention_policy": "retain_all",
   "workflows": {
-    "[Archive]-cdr-to-ndr": {
+    "archive-cdr-to-ndr": {
       "id": "51609280-6784-4d7f-abe1-bad0af87964f",
-      "name": "[Archive] cdr-to-ndr",
+      "name": "archive-cdr-to-ndr",
       "inserted_at": "2024-06-12T10:36:15Z",
-      "updated_at": "2024-06-13T11:14:02Z",
+      "updated_at": "2024-06-13T13:55:14Z",
       "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
       "deleted_at": null,
-      "lock_version": 100,
+      "lock_version": 104,
       "triggers": {
         "webhook": {
           "enabled": true,
@@ -66,13 +66,6 @@
           "condition_type": "on_job_success",
           "target_job_id": "ac44aea9-d9cc-4588-9072-964db312916a"
         },
-        "Map-and-process-data->Post-to-HAPI-FHIR": {
-          "enabled": true,
-          "id": "3f99f218-b538-4a95-98f1-9341f52f198a",
-          "source_job_id": "155ed6d7-1e29-412a-a011-07422459c1e5",
-          "condition_type": "on_job_success",
-          "target_job_id": "ba9a0e7d-81a2-4fb5-b376-a233b3738471"
-        },
         "Post-to-HAPI-FHIR->Report-Error": {
           "enabled": true,
           "id": "f5dc9d61-497b-4a4f-ae76-2972c4efa574",
@@ -81,6 +74,13 @@
           "condition_expression": "state.data.response.statusCode==400",
           "condition_label": "failed?",
           "target_job_id": "41771ce6-2772-4750-b929-7adf87748cd4"
+        },
+        "Map-and-process-data->Post-to-HAPI-FHIR": {
+          "enabled": true,
+          "id": "3f99f218-b538-4a95-98f1-9341f52f198a",
+          "source_job_id": "155ed6d7-1e29-412a-a011-07422459c1e5",
+          "condition_type": "on_job_success",
+          "target_job_id": "ba9a0e7d-81a2-4fb5-b376-a233b3738471"
         }
       }
     },
@@ -88,10 +88,10 @@
       "id": "ad8f643a-6bda-453e-af48-aeb213069538",
       "name": "cdr-to-ndr",
       "inserted_at": "2024-06-13T08:12:03Z",
-      "updated_at": "2024-06-13T13:00:23Z",
+      "updated_at": "2024-06-13T13:54:51Z",
       "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
       "deleted_at": null,
-      "lock_version": 12,
+      "lock_version": 41,
       "triggers": {
         "webhook": {
           "enabled": true,
@@ -100,23 +100,23 @@
         }
       },
       "jobs": {
-        "Annonymize-Data": {
+        "Analyze-Data": {
           "id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b",
-          "name": "Annonymize Data",
-          "body": "fn(state=> {\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.address;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
+          "name": "Analyze Data",
+          "body": "fn(state=> {\n    //Removig PII here before sending it to NDR\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
           "adaptor": "@openfn/language-common@latest"
         },
         "Create-Organization": {
           "id": "52a8787c-fefe-42ce-96cb-84270d9d9da2",
           "name": "Create Organization",
-          "body": "// Use pure JavaScript to add operations to your\n// step. Click Docs to see list of operations or visit\n// https://bit.ly/OFNJWG for our job writing guide\n// and example job codes.\n",
+          "body": "// Use pure JavaScript to add operations to your\n// step. Click Docs to see list of operations or visit\n// https://bit.ly/OFNJWG for our job writing guide\n// and example job codes.\ncreate(\"Organization\", $.organization)",
           "adaptor": "@openfn/language-fhir@latest"
         },
-        "Create-Patient": {
+        "Create-FHIR-Resource": {
           "id": "75e04925-019d-4787-853a-54275fedd86f",
-          "name": "Create Patient",
-          "body": "// Use pure JavaScript to add operations to your\n// step. Click Docs to see list of operations or visit\n// https://bit.ly/OFNJWG for our job writing guide\n// and example job codes.\n",
-          "adaptor": "@openfn/language-fhir@latest"
+          "name": "Create FHIR Resource",
+          "body": "post($.data.resourceType, \n  {\n    body: $.patient, \n    errors: { 400: false }, \t\n    headers: {'content-type': 'application/json'},\n    parseAs: 'json'\n  },\n  state => {\n    state.data.response = state.response; \n    return state; \n})",
+          "adaptor": "@openfn/language-http@latest"
         },
         "Create-Encounter": {
           "id": "ac088906-4413-4222-8d94-eca91fdeb73a",
@@ -133,97 +133,72 @@
         "Log-error": {
           "id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c",
           "name": "Log error",
-          "body": "// Use pure JavaScript to add operations to your\n// step. Click Docs to see list of operations or visit\n// https://bit.ly/OFNJWG for our job writing guide\n// and example job codes.\n",
+          "body": "fn(state => {\n  state.errorLog = {\n    resource_id: state.data.id,\n    failure_type: 'validation error',\n    //data: state.references[0], //data we tried to create\n    resource_type: state.references[0].resourceType,\n    issue_code: state.data.issue[0].code,\n    issue_detail: state.data.issue[0].details.text,\n    issue_diagnostics: state.data.issue[0].diagnostics,\n    issue_location: state.data.issue[0].location,\n    last_updated: state.data.meta.lastUpdated,\n    statusCode: state.data.response.statusCode,\n    statusMessage: state.data.response.statusMessage\n  }\n  console.log('Error to log:: ', JSON.stringify(state.errorLog,null,2)); \n  return state; \n});\n\n// insert('fhir_errors', \n//   state => state.errorLog, \n//   { logValues: true }\n// );\n\n//kafka mappings - don't think we need these\n// ts: state.request.ts,\n//     topic: state.request.topic,\n//     offset: state.request.offset,\n//     partition: state.request.partition,\n//     key: state.request.key,",
           "adaptor": "@openfn/language-postgresql@latest"
         },
         "Map-Data": {
           "id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
           "name": "Map Data",
-          "body": "fn(state=> {\nconst fhirData = state.data;\n\nconst patient = {\n  resourceType: fhirData.resourceType,\n  id: fhirData.id,\n  identifier: fhirData.identifier.map(id => ({\n    system: id.system,\n    value: id.value,\n  })),\n  active: fhirData.active,\n  gender: fhirData.gender,\n  birthDate: fhirData.birthDate,\n\n  managingOrganization: fhirData.managingOrganization.reference,\n  deceasedBoolean: fhirData.deceasedBoolean,\n  text: fhirData.text\n};\n\nreturn {...state, patient}\n})",
+          "body": "fn(state=> {\n  //Map CDR data to NDR FHIR IG\n    const cdrData = state.data;\n    const patient = {\n      resourceType: cdrData.resourceType,\n      id: cdrData.id,\n      identifier: cdrData.identifier.map(id => ({\n        type: id.system == \"http://cdr.aacahb.gov.et/MRN\"? {\n                    \"coding\": [\n                        {\n                            \"code\": \"MR\",\n                            \"display\": \"Medical record number\",\n                            \"system\": \"http://terminology.hl7.org/CodeSystem/v2-0203\"\n                        }\n                    ],\n                    \"text\": \"Medical record number\"\n                } : undefined,\n        system: id.system,\n        value: id.value,\n      })),\n      active: cdrData.active,\n      gender: cdrData.gender,\n      birthDate: cdrData.birthDate,\n      address: cdrData.address,\n      managingOrganization: cdrData.managingOrganization,\n      deceasedBoolean: cdrData.deceasedBoolean,\n      text: cdrData.text\n    };\n// returned the mapped patient object\n    return {...state, patient}\n})",
+          "adaptor": "@openfn/language-common@latest"
+        },
+        "Remove-PIIs": {
+          "id": "a190cc21-e997-439d-a5ea-64895921eadb",
+          "name": "Remove PIIs",
+          "body": "fn(state=> {\n    //Removig PII here before sending it to NDR\n    delete state.data.name;\n    delete state.data.telecom;\n    delete state.data.contact;\n    delete state.data.extension; //contains religion, occupation, education level, target pop group\n    delete state.data.maritalStatus; \n\n    //only keeping birthdate and gender\n\n    return state;\n})",
           "adaptor": "@openfn/language-common@latest"
         }
       },
       "edges": {
-        "webhook->Annonymize-Data": {
+        "webhook->Analyze-Data": {
           "enabled": true,
           "id": "0bf806f1-3c51-4a8b-be6e-66ba9075c0f6",
           "source_trigger_id": "9308f827-2912-4368-8892-9a9d5ed53301",
           "condition_type": "always",
           "target_job_id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b"
         },
-        "Create-Encounter->Log-error": {
-          "enabled": true,
-          "id": "7e70321e-7431-4862-8dd8-a89c003596eb",
-          "source_job_id": "ac088906-4413-4222-8d94-eca91fdeb73a",
-          "condition_type": "on_job_failure",
-          "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
-        },
-        "Create-Condition->Log-error": {
-          "enabled": true,
-          "id": "f1325cf6-b1b2-41f0-b796-f9438a4aef23",
-          "source_job_id": "5f3abe70-39fe-466a-954f-6826b2469def",
-          "condition_type": "on_job_failure",
-          "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
-        },
-        "Create-Patient->Log-error": {
+        "Create-FHIR-Resource->Log-error": {
           "enabled": true,
           "id": "7b0d3bb6-1d12-4f74-8acb-3664797f3c49",
           "source_job_id": "75e04925-019d-4787-853a-54275fedd86f",
-          "condition_type": "on_job_failure",
+          "condition_type": "js_expression",
+          "condition_expression": "state.data.response.statusCode==400",
+          "condition_label": "failed?",
           "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
         },
-        "Create-Organization->Log-error": {
-          "enabled": true,
-          "id": "efc37e16-830b-4430-9d2d-ab696d98875c",
-          "source_job_id": "52a8787c-fefe-42ce-96cb-84270d9d9da2",
-          "condition_type": "on_job_failure",
-          "target_job_id": "34a72fe3-d1e8-4a67-b06f-749d157ba61c"
-        },
-        "Annonymize-Data->Map-Data": {
-          "enabled": true,
-          "id": "8b5f7252-7e6e-40ec-b684-2fb3845f4489",
-          "source_job_id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b",
-          "condition_type": "on_job_success",
-          "target_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6"
-        },
-        "Map-Data->Create-Organization": {
-          "enabled": true,
-          "id": "6ad31fc3-a1b1-4fa5-98b2-d4bad99029bc",
-          "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
-          "condition_type": "on_job_success",
-          "target_job_id": "52a8787c-fefe-42ce-96cb-84270d9d9da2"
-        },
-        "Map-Data->Create-Condition": {
-          "enabled": true,
-          "id": "ab4d4926-eba8-4482-a121-d56fd9e1716a",
-          "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
-          "condition_type": "on_job_success",
-          "target_job_id": "5f3abe70-39fe-466a-954f-6826b2469def"
-        },
-        "Map-Data->Create-Patient": {
+        "Map-Data->Create-FHIR-Resource": {
           "enabled": true,
           "id": "98f49aad-8f62-4bee-992f-ffa33bbf6ec9",
           "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
           "condition_type": "on_job_success",
+          "condition_expression": "!state.errors && state.data.resourceType == 'Patient'",
+          "condition_label": "is Patient?",
           "target_job_id": "75e04925-019d-4787-853a-54275fedd86f"
         },
-        "Map-Data->Create-Encounter": {
+        "Analyze-Data->Remove-PIIs": {
           "enabled": true,
-          "id": "dd15fcc7-0abc-40f1-a5fb-f5557218df90",
-          "source_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6",
+          "id": "de8295a8-a953-452a-a7d9-c9e4927eadcb",
+          "source_job_id": "205bd35c-32e0-4cd0-964f-98d4c6729a8b",
           "condition_type": "on_job_success",
-          "target_job_id": "ac088906-4413-4222-8d94-eca91fdeb73a"
+          "target_job_id": "a190cc21-e997-439d-a5ea-64895921eadb"
+        },
+        "Remove-PIIs->Map-Data": {
+          "enabled": true,
+          "id": "fb0f5811-377e-42c7-b2fa-a12553fb34ab",
+          "source_job_id": "a190cc21-e997-439d-a5ea-64895921eadb",
+          "condition_type": "on_job_success",
+          "target_job_id": "e4bad1bf-a006-405f-ae2e-681968c9ebf6"
         }
       }
     },
-    "test-patient-fhir": {
+    "test-patient-http": {
       "id": "79930c19-1ce1-4144-82ab-e10d7652e2b5",
-      "name": "test-patient-fhir",
+      "name": "test-patient-http",
       "inserted_at": "2024-06-13T11:39:36Z",
-      "updated_at": "2024-06-13T12:56:45Z",
+      "updated_at": "2024-06-13T13:13:14Z",
       "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
       "deleted_at": null,
-      "lock_version": 7,
+      "lock_version": 8,
       "triggers": {
         "webhook": {
           "enabled": true,
@@ -246,6 +221,39 @@
           "source_trigger_id": "b8aaf960-b742-4e20-b474-45eb60583e92",
           "condition_type": "always",
           "target_job_id": "a3b64302-94f1-4cb5-9490-ba87eb6dd6c6"
+        }
+      }
+    },
+    "test-patient-fhir": {
+      "id": "3a6803de-2cca-4a83-a93d-8f52e796dedf",
+      "name": "test-patient-fhir",
+      "inserted_at": "2024-06-13T13:13:36Z",
+      "updated_at": "2024-06-13T13:48:00Z",
+      "project_id": "d52bd48e-451b-4a92-9aad-e7c62a7f0923",
+      "deleted_at": null,
+      "lock_version": 20,
+      "triggers": {
+        "webhook": {
+          "enabled": true,
+          "id": "475edbcc-8730-4626-906b-4f2eb508502b",
+          "type": "webhook"
+        }
+      },
+      "jobs": {
+        "parse-json": {
+          "id": "c7b04b67-6c06-4281-a209-7bfa8fad44b4",
+          "name": "parse json",
+          "body": "fn(state => {\n  const parsedData = JSON.parse(state.data.body); \n  console.log(parsedData); \n  state.resource = parsedData.entry[0].resource; \n  console.log('show only the resource:: ', state.resource);\n  return state; \n})\n\n\n//testing using create instead of post\n//create(\"Patient\", state => state.data)\n //headers: {'content-type': 'application/json'}, \n //errors: { 400: false }, \t\n //parseAs: 'json',\n//  , state => {\n//   //console.log('response ::', JSON.stringify(state.response, null,2));\n//   state.data.response = state.response; \n//   return state; \n//  }",
+          "adaptor": "@openfn/language-common@latest"
+        }
+      },
+      "edges": {
+        "webhook->parse-json": {
+          "enabled": true,
+          "id": "d9197ef6-a544-4b15-9c88-559a1888ec93",
+          "source_trigger_id": "475edbcc-8730-4626-906b-4f2eb508502b",
+          "condition_type": "always",
+          "target_job_id": "c7b04b67-6c06-4281-a209-7bfa8fad44b4"
         }
       }
     }

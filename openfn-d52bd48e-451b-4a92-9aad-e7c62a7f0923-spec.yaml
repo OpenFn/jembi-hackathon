@@ -3,8 +3,8 @@ name: jembi-demo
 # credentials:
 # globals:
 workflows:
-  [Archive]-cdr-to-ndr:
-    name: [Archive] cdr-to-ndr
+  archive-cdr-to-ndr:
+    name: archive-cdr-to-ndr
     jobs:
       Map-and-process-data:
         name: Map and process data
@@ -106,11 +106,6 @@ workflows:
         target_job: Validate-with-NDR-HAPI-FHIR
         condition_type: on_job_success
         enabled: false
-      Map-and-process-data->Post-to-HAPI-FHIR:
-        source_job: Map-and-process-data
-        target_job: Post-to-HAPI-FHIR
-        condition_type: on_job_success
-        enabled: true
       Post-to-HAPI-FHIR->Report-Error:
         source_job: Post-to-HAPI-FHIR
         target_job: Report-Error
@@ -118,19 +113,24 @@ workflows:
         condition_label: failed?
         condition_expression: state.data.response.statusCode==400
         enabled: true
+      Map-and-process-data->Post-to-HAPI-FHIR:
+        source_job: Map-and-process-data
+        target_job: Post-to-HAPI-FHIR
+        condition_type: on_job_success
+        enabled: true
   cdr-to-ndr:
     name: cdr-to-ndr
     jobs:
-      Annonymize-Data:
-        name: Annonymize Data
+      Analyze-Data:
+        name: Analyze Data
         adaptor: '@openfn/language-common@latest'
         # credential:
         # globals:
         body: |
           fn(state=> {
+              //Removig PII here before sending it to NDR
               delete state.data.name;
               delete state.data.telecom;
-              delete state.data.address;
               delete state.data.contact;
               delete state.data.extension; //contains religion, occupation, education level, target pop group
               delete state.data.maritalStatus; 
@@ -149,18 +149,24 @@ workflows:
           // step. Click Docs to see list of operations or visit
           // https://bit.ly/OFNJWG for our job writing guide
           // and example job codes.
-          
-      Create-Patient:
-        name: Create Patient
-        adaptor: '@openfn/language-fhir@latest'
+          create("Organization", $.organization)
+      Create-FHIR-Resource:
+        name: Create FHIR Resource
+        adaptor: '@openfn/language-http@latest'
         # credential:
         # globals:
         body: |
-          // Use pure JavaScript to add operations to your
-          // step. Click Docs to see list of operations or visit
-          // https://bit.ly/OFNJWG for our job writing guide
-          // and example job codes.
-          
+          post($.data.resourceType, 
+            {
+              body: $.patient, 
+              errors: { 400: false }, 	
+              headers: {'content-type': 'application/json'},
+              parseAs: 'json'
+            },
+            state => {
+              state.data.response = state.response; 
+              return state; 
+          })
       Create-Encounter:
         name: Create Encounter
         adaptor: '@openfn/language-fhir@latest'
@@ -189,11 +195,35 @@ workflows:
         # credential:
         # globals:
         body: |
-          // Use pure JavaScript to add operations to your
-          // step. Click Docs to see list of operations or visit
-          // https://bit.ly/OFNJWG for our job writing guide
-          // and example job codes.
+          fn(state => {
+            state.errorLog = {
+              resource_id: state.data.id,
+              failure_type: 'validation error',
+              //data: state.references[0], //data we tried to create
+              resource_type: state.references[0].resourceType,
+              issue_code: state.data.issue[0].code,
+              issue_detail: state.data.issue[0].details.text,
+              issue_diagnostics: state.data.issue[0].diagnostics,
+              issue_location: state.data.issue[0].location,
+              last_updated: state.data.meta.lastUpdated,
+              statusCode: state.data.response.statusCode,
+              statusMessage: state.data.response.statusMessage
+            }
+            console.log('Error to log:: ', JSON.stringify(state.errorLog,null,2)); 
+            return state; 
+          });
           
+          // insert('fhir_errors', 
+          //   state => state.errorLog, 
+          //   { logValues: true }
+          // );
+          
+          //kafka mappings - don't think we need these
+          // ts: state.request.ts,
+          //     topic: state.request.topic,
+          //     offset: state.request.offset,
+          //     partition: state.request.partition,
+          //     key: state.request.key,
       Map-Data:
         name: Map Data
         adaptor: '@openfn/language-common@latest'
@@ -201,83 +231,126 @@ workflows:
         # globals:
         body: |
           fn(state=> {
-          const fhirData = state.data;
+            //Map CDR data to NDR FHIR IG
+              const cdrData = state.data;
+              const patient = {
+                resourceType: cdrData.resourceType,
+                id: cdrData.id,
+                identifier: cdrData.identifier.map(id => ({
+                  type: id.system == "http://cdr.aacahb.gov.et/MRN"? {
+                              "coding": [
+                                  {
+                                      "code": "MR",
+                                      "display": "Medical record number",
+                                      "system": "http://terminology.hl7.org/CodeSystem/v2-0203"
+                                  }
+                              ],
+                              "text": "Medical record number"
+                          } : undefined,
+                  system: id.system,
+                  value: id.value,
+                })),
+                active: cdrData.active,
+                gender: cdrData.gender,
+                birthDate: cdrData.birthDate,
+                address: cdrData.address,
+                managingOrganization: cdrData.managingOrganization,
+                deceasedBoolean: cdrData.deceasedBoolean,
+                text: cdrData.text
+              };
+          // returned the mapped patient object
+              return {...state, patient}
+          })
+      Remove-PIIs:
+        name: Remove PIIs
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state=> {
+              //Removig PII here before sending it to NDR
+              delete state.data.name;
+              delete state.data.telecom;
+              delete state.data.contact;
+              delete state.data.extension; //contains religion, occupation, education level, target pop group
+              delete state.data.maritalStatus; 
           
-          const patient = {
-            resourceType: fhirData.resourceType,
-            id: fhirData.id,
-            identifier: fhirData.identifier.map(id => ({
-              system: id.system,
-              value: id.value,
-            })),
-            active: fhirData.active,
-            gender: fhirData.gender,
-            birthDate: fhirData.birthDate,
+              //only keeping birthdate and gender
           
-            managingOrganization: fhirData.managingOrganization.reference,
-            deceasedBoolean: fhirData.deceasedBoolean,
-            text: fhirData.text
-          };
-          
-          return {...state, patient}
+              return state;
           })
     triggers:
       webhook:
         type: webhook
         enabled: true
     edges:
-      webhook->Annonymize-Data:
+      webhook->Analyze-Data:
         source_trigger: webhook
-        target_job: Annonymize-Data
+        target_job: Analyze-Data
         condition_type: always
         enabled: true
-      Create-Encounter->Log-error:
-        source_job: Create-Encounter
+      Create-FHIR-Resource->Log-error:
+        source_job: Create-FHIR-Resource
         target_job: Log-error
-        condition_type: on_job_failure
+        condition_type: js_expression
+        condition_label: failed?
+        condition_expression: state.data.response.statusCode==400
         enabled: true
-      Create-Condition->Log-error:
-        source_job: Create-Condition
-        target_job: Log-error
-        condition_type: on_job_failure
+      Map-Data->Create-FHIR-Resource:
+        source_job: Map-Data
+        target_job: Create-FHIR-Resource
+        condition_type: on_job_success
         enabled: true
-      Create-Patient->Log-error:
-        source_job: Create-Patient
-        target_job: Log-error
-        condition_type: on_job_failure
+      Analyze-Data->Remove-PIIs:
+        source_job: Analyze-Data
+        target_job: Remove-PIIs
+        condition_type: on_job_success
         enabled: true
-      Create-Organization->Log-error:
-        source_job: Create-Organization
-        target_job: Log-error
-        condition_type: on_job_failure
-        enabled: true
-      Annonymize-Data->Map-Data:
-        source_job: Annonymize-Data
+      Remove-PIIs->Map-Data:
+        source_job: Remove-PIIs
         target_job: Map-Data
-        condition_type: on_job_success
-        enabled: true
-      Map-Data->Create-Organization:
-        source_job: Map-Data
-        target_job: Create-Organization
-        condition_type: on_job_success
-        enabled: true
-      Map-Data->Create-Condition:
-        source_job: Map-Data
-        target_job: Create-Condition
-        condition_type: on_job_success
-        enabled: true
-      Map-Data->Create-Patient:
-        source_job: Map-Data
-        target_job: Create-Patient
-        condition_type: on_job_success
-        enabled: true
-      Map-Data->Create-Encounter:
-        source_job: Map-Data
-        target_job: Create-Encounter
         condition_type: on_job_success
         enabled: true
   test-patient-fhir:
     name: test-patient-fhir
+    jobs:
+      parse-json:
+        name: parse json
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state => {
+            const parsedData = JSON.parse(state.data.body); 
+            console.log(parsedData); 
+            state.resource = parsedData.entry[0].resource; 
+            console.log('show only the resource:: ', state.resource);
+            return state; 
+          })
+          
+          
+          //testing using create instead of post
+          //create("Patient", state => state.data)
+           //headers: {'content-type': 'application/json'}, 
+           //errors: { 400: false }, 	
+           //parseAs: 'json',
+          //  , state => {
+          //   //console.log('response ::', JSON.stringify(state.response, null,2));
+          //   state.data.response = state.response; 
+          //   return state; 
+          //  }
+    triggers:
+      webhook:
+        type: webhook
+        enabled: true
+    edges:
+      webhook->parse-json:
+        source_trigger: webhook
+        target_job: parse-json
+        condition_type: always
+        enabled: true
+  test-patient-http:
+    name: test-patient-http
     jobs:
       Post-Patient:
         name: Post Patient

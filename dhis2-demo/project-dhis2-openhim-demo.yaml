@@ -3,27 +3,58 @@ name: dhis2-openhim-demo
 # credentials: dhis2 play
 # globals:
 workflows:
-  dhis2-to-openhim:
-    name: dhis2-to-openhim
+  dhis2-tracker-get:
+    name: dhis2-tracker-get
     jobs:
-      Get-trackedEntities:
-        name: Get trackedEntities
-        adaptor: '@openfn/language-dhis2@latest'
+      Get-TEIs-from-DHIS2:
+        name: Get TEIs from DHIS2
+        adaptor: '@openfn/language-dhis2@4.1.0'
         # credential:
         # globals:
         body: |
           get('trackedEntityInstances', {
-          ou: 'DiszpKrYNg8',
-          program: 'IpHINAT79UW'
+              ou: 'DiszpKrYNg8',
+              program: 'IpHINAT79UW'
           });
+      map-and-transform-data:
+        name: map and transform data
+        adaptor: '@openfn/language-common@latest'
+        # credential:
+        # globals:
+        body: |
+          fn(state => {
+            console.log('data from prior step:: ', state.data);
+            // do some things to state to map & transform
+            return state;
+          });
+      post-to-openhim:
+        name: post to openhim
+        adaptor: '@openfn/language-http@latest'
+        # credential:
+        # globals:
+        body: |
+          post('https://openhim.platform.jembi.cloud/', {
+             body: {'foo': 'bar'},
+             headers: {'content-type': 'application/json'},
+           })
     triggers:
       cron:
         type: cron
-        cron_expression: '0 0 * * *'
+        cron_expression: '00 02 * * *'
         enabled: true
     edges:
-      cron->Get-trackedEntities:
+      cron->Get-TEIs-from-DHIS2:
         source_trigger: cron
-        target_job: Get-trackedEntities
+        target_job: Get-TEIs-from-DHIS2
         condition_type: always
+        enabled: true
+      Get-TEIs-from-DHIS2->map-and-transform-data:
+        source_job: Get-TEIs-from-DHIS2
+        target_job: map-and-transform-data
+        condition_type: on_job_success
+        enabled: true
+      map-and-transform-data->post-to-openhim:
+        source_job: map-and-transform-data
+        target_job: post-to-openhim
+        condition_type: on_job_success
         enabled: true

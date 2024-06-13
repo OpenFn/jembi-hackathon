@@ -1,0 +1,29 @@
+name: dhis2-openhim-demo
+# description: example config for a workflow that exports dhis3 trackedEntities to sync to openhim
+# credentials: dhis2 play
+# globals:
+workflows:
+  dhis2-to-openhim:
+    name: dhis2-to-openhim
+    jobs:
+      Get-trackedEntities:
+        name: Get trackedEntities
+        adaptor: '@openfn/language-dhis2@latest'
+        # credential:
+        # globals:
+        body: |
+          get('trackedEntityInstances', {
+          ou: 'DiszpKrYNg8',
+          program: 'IpHINAT79UW'
+          });
+    triggers:
+      cron:
+        type: cron
+        cron_expression: '0 0 * * *'
+        enabled: true
+    edges:
+      cron->Get-trackedEntities:
+        source_trigger: cron
+        target_job: Get-trackedEntities
+        condition_type: always
+        enabled: true

@@ -1,7 +1,7 @@
 // language-http
 post("Patient", {body: state.data,  
  headers: {'content-type': 'application/json'}, 
- //parseAs: 'json',
+ parseAs: 'json',
  }
 //**NOTE: later I added below callback to manually write error object to state **//
 //  , state => {

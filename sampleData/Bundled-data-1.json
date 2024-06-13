@@ -1,0 +1,119 @@
+{
+  "resourceType": "Bundle",
+  "id": "bundle-transaction",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "https://openhimcore.cdr.aacahb.gov.et/fhir/MedicationStatement/65a181f27cf44005b6d8ca33885a3d9a",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "65a181f27cf44005b6d8ca33885a3d9a",
+        "extension": [
+          {
+            "url": "http://cdr.aacahb.gov.et/TreatmentPhase",
+            "valueString": "INHCompleted"
+          }
+        ],
+        "status": "completed",
+        "category": {
+          "coding": [
+            { "system": "http://snomed.info/sct", "code": "699618001" }
+          ],
+          "text": "Tuberculosis preventive therapy"
+        },
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "387472004",
+              "display": "Isoniazid"
+            }
+          ],
+          "text": "INH"
+        },
+        "subject": { "reference": "Patient/839fe329304c40ab867ef27012cdf82b" },
+        "context": {
+          "reference": "Encounter/ea0508202ec64c40a0f208cb1a601cb9"
+        },
+        "effectivePeriod": { "start": "2020-02-05", "end": "2020-06-04" },
+        "reasonCode": [
+          {
+            "coding": [
+              {
+                "system": "http://cdr.aacahb.gov.et/prophylaxis-type",
+                "code": "inh"
+              }
+            ],
+            "text": "INH"
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "MedicationStatement/65a181f27cf44005b6d8ca33885a3d9a"
+      }
+    },
+    {
+      "fullUrl": "https://openhimcore.cdr.aacahb.gov.et/fhir/QuestionnaireResponse/6045a7ac00d1460a824970466fe7287a",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "6045a7ac00d1460a824970466fe7287a",
+        "questionnaire": "PregnancyStatus",
+        "status": "completed",
+        "subject": { "reference": "Patient/839fe329304c40ab867ef27012cdf82b" },
+        "encounter": {
+          "reference": "Encounter/ea0508202ec64c40a0f208cb1a601cb9"
+        },
+        "item": [
+          {
+            "linkId": "pregnant",
+            "text": "Is Pregnant",
+            "answer": [
+              {
+                "valueBoolean": false,
+                "item": [
+                  {
+                    "linkId": "pregnant.want-to-be-pregnant",
+                    "text": "Want to be pregnant"
+                  }
+                ]
+              }
+            ]
+          },
+          { "linkId": "is-breast-feeding", "text": "Is breastfeeding" }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "QuestionnaireResponse/6045a7ac00d1460a824970466fe7287a"
+      }
+    },
+    {
+      "fullUrl": "https://openhimcore.cdr.aacahb.gov.et/fhir/MedicationStatement/dec123c6b2b34d4387e74f6b152f27c8",
+      "resource": {
+        "resourceType": "MedicationStatement",
+        "id": "dec123c6b2b34d4387e74f6b152f27c8",
+        "status": "active",
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://snomed.info/sct",
+              "code": "398731002",
+              "display": "Product containing sulfamethoxazole and trimethoprim"
+            }
+          ],
+          "text": "Co-trimoxazole"
+        },
+        "subject": { "reference": "Patient/ba6f99f9c375417bb2fffddbf8bf9f26" },
+        "context": {
+          "reference": "Encounter/6aaf27fc070d4708a274688a68d3e47d"
+        },
+        "effectivePeriod": { "start": "2018-07-20" }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "MedicationStatement/dec123c6b2b34d4387e74f6b152f27c8"
+      }
+    }
+  ]
+}

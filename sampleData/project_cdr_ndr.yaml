@@ -8,7 +8,7 @@ workflows:
     jobs:
       Analyze-Data:
         name: Analyze Data
-        adaptor: "@openfn/language-common@latest"
+        adaptor: '@openfn/language-common@latest'
         # credential:
         # globals:
         body: |
@@ -19,9 +19,9 @@ workflows:
             console.log('show only the resource:: ', state.resource);
             return state; 
           })
-      Remove-PIIs:
-        name: Remove PIIs
-        adaptor: "@openfn/language-common@latest"
+      Clean-data-and-PII:
+        name: Clean data and PII
+        adaptor: '@openfn/language-common@latest'
         # credential:
         # globals:
         body: |
@@ -32,14 +32,14 @@ workflows:
               delete state.resource.contact;
               delete state.resource.extension; //contains religion, occupation, education level, target pop group
               delete state.resource.maritalStatus; 
-
+          
               //only keeping birthdate and gender
-
+          
               return state;
           })
       Map-Data:
         name: Map Data
-        adaptor: "@openfn/language-common@latest"
+        adaptor: '@openfn/language-common@latest'
         # credential:
         # globals:
         body: |
@@ -77,7 +77,7 @@ workflows:
           })
       Create-FHIR-Resource:
         name: Create FHIR Resource
-        adaptor: "@openfn/language-http@latest"
+        adaptor: '@openfn/language-http@latest'
         # credential:
         # globals:
         body: |
@@ -94,39 +94,33 @@ workflows:
           })
       Log-Error:
         name: Log Error
-        adaptor: "@openfn/language-postgresql@latest"
+        adaptor: '@openfn/language-postgresql@latest'
         # credential:
         # globals:
         body: |
           fn(state => {
             state.errorLog = {
               resource_id: state.data.id,
-              failure_type: 'validation error',
-              //data: state.references[0], //data we tried to create
               resource_type: state.references[0].resourceType,
               issue_code: state.data.issue[0].code,
               issue_detail: state.data.issue[0].details.text,
               issue_diagnostics: state.data.issue[0].diagnostics,
               issue_location: state.data.issue[0].location,
               last_updated: state.data.meta.lastUpdated,
-              statusCode: state.data.response.statusCode,
-              statusMessage: state.data.response.statusMessage
+              status_code: state.data.response.statusCode,
+              status_message: state.data.response.statusMessage,
+              failure_type: 'validation error',
+              //data: state.references[0], //data we tried to create
             }
             console.log('Error to log:: ', JSON.stringify(state.errorLog,null,2)); 
             return state; 
           });
-
-          // insert('fhir_errors', 
-          //   state => state.errorLog, 
-          //   { logValues: true }
-          // );
-
-          //kafka mappings - don't think we need these
-          // ts: state.request.ts,
-          //     topic: state.request.topic,
-          //     offset: state.request.offset,
-          //     partition: state.request.partition,
-          //     key: state.request.key,
+          
+          insert('errors', 
+            state => state.errorLog, 
+            { logValues: true }
+          );
+          
     triggers:
       webhook:
         type: webhook
@@ -137,13 +131,13 @@ workflows:
         target_job: Analyze-Data
         condition_type: always
         enabled: true
-      Analyze-Data->Remove-PIIs:
+      Analyze-Data->Clean-data-and-PII:
         source_job: Analyze-Data
-        target_job: Remove-PIIs
+        target_job: Clean-data-and-PII
         condition_type: on_job_success
         enabled: true
-      Remove-PIIs->Map-Data:
-        source_job: Remove-PIIs
+      Clean-data-and-PII->Map-Data:
+        source_job: Clean-data-and-PII
         target_job: Map-Data
         condition_type: on_job_success
         enabled: true
